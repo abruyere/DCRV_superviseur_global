@@ -140,7 +140,7 @@ function envoieEtatVoiture(dataJson){
 
 
     voiture.vitesse = dataJson.vitesse;
-    //console.log('Vitesse serveur===> ' + voiture.vitesse);
+    console.log('Vitesse => ' + voiture.vitesse);
 
     // Vérifier si position compris entre -1 et 1
     if(voiture.vitesse < -1) voiture.vitesse = -1;
@@ -150,7 +150,7 @@ function envoieEtatVoiture(dataJson){
     // On divise la vitesse pour aller moins vite sur le circuit, autrement c'est beaucoup trop rapide et ne ressemble pas à une vraie course
     dataJson.vitesse = dataJson.vitesse / 60;
     let position = (voiture.position + (dataJson.vitesse * 0.05));
-    //console.log(position);
+    console.log("position =>" + position);
     // La position s'exprime comme un chiffre compris entre 0 et 1
     if(position >= 1) position -= 1;
     if(position < 0) position += 1;
