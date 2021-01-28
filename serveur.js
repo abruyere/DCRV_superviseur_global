@@ -121,8 +121,8 @@ function envoieEtatVoiture(dataJson){
     // Pour se faire, il faut prendre la position actuelle de la voiture et additionner avec
     // la vitesse angulaire multiplié par la période
     // ==> position de la voiture = position actuelle + (vitesse voiture * période)
-    // ex: Avec une période de 0.05 s, une vitesse de pi rad/s, position actuelle de 0 rad
-    // positon = 0 + (pi * 0.05) = 0.05pi rad
+    // ex: Avec une période de 0.10 s, une vitesse de pi rad/s, position actuelle de 0 rad
+    // positon = 0 + (pi * 0.10) = 0.10pi rad
       
     // TODO: gérer les erreurs
 
@@ -149,7 +149,7 @@ function envoieEtatVoiture(dataJson){
     // Calcul
     // On divise la vitesse pour aller moins vite sur le circuit, autrement c'est beaucoup trop rapide et ne ressemble pas à une vraie course
     dataJson.vitesse = dataJson.vitesse / 60;
-    let position = (voiture.position + (dataJson.vitesse * 0.05));
+    let position = (voiture.position + (dataJson.vitesse * 0.10));
     console.log("position =>" + position);
     // La position s'exprime comme un chiffre compris entre 0 et 1
     if(position >= 1) position -= 1;
@@ -243,7 +243,7 @@ server.on('connection', function(socket, req) {
 
     // On indique à la voiture qu'elle est connectée
     socket.send(JSON.stringify({
-      'mode': 6,
+      'mode': 5,
       'etat': 1
     }));
   }
@@ -354,6 +354,9 @@ server.on('connection', function(socket, req) {
             'mode': drapeauToInt(dataJson.mode),
             'vitesse': 0
           }));
+          // On indique 
+          dataJson.vitesse = 0
+          envoieEtatVoiture(dataJson);
         }
       }
     break;
