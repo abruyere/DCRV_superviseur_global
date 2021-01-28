@@ -68,6 +68,52 @@ function reinitialisationVoiture(voiture) {
   voiture.tour = 0;
 }
 
+function drapeauToInt(drapeau){
+  switch (drapeau) {
+    case 'DRAPEAU_NOIR':
+      return 0;  
+    break;
+    case 'DRAPEAU_VERT':
+      return 1;  
+    break;
+    case 'DRAPEAU_JAUNE':
+      return 2;  
+    break;
+    case 'DRAPEAU_ROUGE':
+      return 3;  
+    break;
+    case 'DRAPEAU_NOIR_A_DAMIER':
+      return 4;  
+    break;
+  }
+}
+
+function intToDrapeau(mode) {
+  switch (mode) {
+    case 0:
+      return 'DRAPEAU_NOIR';  
+    break;
+    case 1:
+      return 'DRAPEAU_VERT';
+    break;
+    case 2:
+      return 'DRAPEAU_JAUNE';
+    break;
+    case 3:
+      return 'DRAPEAU_ROUGE';
+    break;
+    case 4:
+      return 'DRAPEAU_NOIR_A_DAMIER';  
+    break;
+  }
+}
+
+// Cette fonction est utile pour envoyer une donnée de vitesse compréhensible facilement par l'esp32 et le bas-niveaux
+// On préfère les int que les floats
+function vitesseToInt(vitesse) {
+  return vitesse*100;
+}
+
 function envoieEtatVoiture(dataJson){
       
     // On reçu la vitesse angulaire de la part de la voiture
@@ -92,7 +138,9 @@ function envoieEtatVoiture(dataJson){
     // On envoie l'état de la voiture au superviseur global si la voiture est au mode 2
     if(voiture.etat != 2 ) return;
 
+
     voiture.vitesse = dataJson.vitesse;
+    console.log('Vitesse => ' + voiture.vitesse);
 
     // Vérifier si position compris entre -1 et 1
     if(voiture.vitesse < -1) voiture.vitesse = -1;
@@ -102,7 +150,7 @@ function envoieEtatVoiture(dataJson){
     // On divise la vitesse pour aller moins vite sur le circuit, autrement c'est beaucoup trop rapide et ne ressemble pas à une vraie course
     dataJson.vitesse = dataJson.vitesse / 60;
     let position = (voiture.position + (dataJson.vitesse * 0.05));
-    //console.log(position);
+    console.log("position =>" + position);
     // La position s'exprime comme un chiffre compris entre 0 et 1
     if(position >= 1) position -= 1;
     if(position < 0) position += 1;
@@ -125,11 +173,12 @@ function envoieEtatVoiture(dataJson){
     // On envoie l'état de la voiture à l'interface de supervision
     interfaceSocket.send(JSON.stringify(voiture));
     // On envoie l'état de la voiture à la voiture, pour que l'application android connaisse la position
-    let s = getsocket(voiture.id);
+    /*let s = getsocket(voiture.id);
     s.send(JSON.stringify({
-      'mode': 'VOITURE_INFO',
-      'position': voiture.position
-    }));
+      'mode': 5,
+      'position': voiture.position * 100,
+      'tour': voiture.tour
+    }));*/
 }
 
 // Cette fonction est lancé lors d'une connection au serveur de la part d'un client(une voiture)
@@ -191,6 +240,12 @@ server.on('connection', function(socket, req) {
 
     // Envoie de la voiture au serveur
     interfaceSocket.send(JSON.stringify(voiture));
+
+    // On indique à la voiture qu'elle est connectée
+    socket.send(JSON.stringify({
+      'mode': 6,
+      'etat': 1
+    }));
   }
 
   socket.on('message', function(data) {
@@ -198,7 +253,15 @@ server.on('connection', function(socket, req) {
   // On transforme les données reçu(string) en JSON
   let dataJson = JSON.parse(data);
   //console.log(voitures);
-  //console.log(dataJson);
+  console.log(dataJson);
+  // La voiture envoie le mode en int pour des soucis d'optimisation,
+  // si on reçoit des données de la voiture on tradruit le int du mode en string pour le switch
+  if(typeof dataJson.mode === 'number') dataJson.mode = intToDrapeau(dataJson.mode);
+
+  // La voiture envoie une vitesse entre -100 et 100, nous on travaille en radian, on divise par 100
+  // pour avoir des vitesses entre -1 et 1
+  dataJson.vitesse = dataJson.vitesse / 100;
+
   // Selon le mode, on effetue une action
   switch (dataJson.mode) {
 
@@ -216,7 +279,9 @@ server.on('connection', function(socket, req) {
       if(socket.id === 'interface'){
         server.clients.forEach(function each(client) {
           if (client !== socket && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(dataJson));
+            client.send(JSON.stringify({
+              'mode': drapeauToInt(dataJson.mode)
+            }));
           }
         });
       }
@@ -226,10 +291,12 @@ server.on('connection', function(socket, req) {
     break;
     case 'DRAPEAU_ROUGE':
       if(socket.id === 'interface'){
-        dataJson.vitesse = 0;
         server.clients.forEach(function each(client) {
           if (client !== socket && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(dataJson));
+            client.send(JSON.stringify({
+              'mode': drapeauToInt(dataJson.mode),
+              'vitesse': 0
+            }));
           }
         })
       }
@@ -239,7 +306,10 @@ server.on('connection', function(socket, req) {
         limite = parseFloat(dataJson.limite);
         server.clients.forEach(function each(client) {
           if (client !== socket && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(dataJson));
+            client.send(JSON.stringify({
+              'mode': drapeauToInt(dataJson.mode),
+              'limite': vitesseToInt(limite)
+            }));
           }
         })
       }else{
@@ -255,10 +325,14 @@ server.on('connection', function(socket, req) {
     case 'DRAPEAU_NOIR':
       // Si on reçoit le message de l'interface graphique
       if(socket.id === 'interface'){
-        dataJson.vitesse = 1;
+        // On veut que les voitures roulent à la vitesse max pour retourner au point de départ
+        let vitesseDrapeauNoir = 1;
         server.clients.forEach(function each(client) {
           if (client !== socket && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(dataJson));
+            client.send(JSON.stringify({
+              'mode': drapeauToInt(dataJson.mode),
+              'vitesse': vitesseToInt(vitesseDrapeauNoir)
+            }));
           }
         })
       }else{
@@ -274,30 +348,27 @@ server.on('connection', function(socket, req) {
           envoieEtatVoiture(dataJson);
         }
         else{
-          dataJson.vitesse = 0;
-          socket.send(JSON.stringify(dataJson));
+          // Si on est arivé au point de départ on arrête la voiture si elle n'est pas déjà arrêtée
+          if(voiture.vitesse === 0) return;
+          socket.send(JSON.stringify({
+            'mode': drapeauToInt(dataJson.mode),
+            'vitesse': 0
+          }));
         }
-      
-        // Calcul
-        //dataJson.vitesse = dataJson.vitesse / 100;
-        //let position = voiture.position + (dataJson.vitesse * 0.05);
-        /*console.log(voiture.position.toFixed(2));
-        if(voiture.position.toFixed(2) === '0.00'){
-          dataJson.vitesse = 0;
-          socket.send(JSON.stringify(dataJson));
-        }*/
-
       }
     break;
     case 'DRAPEAU_NOIR_A_DAMIER':
       // Si on reçoit le message de l'interface graphique
       if(socket.id === 'interface'){
 
-        dataJson.vitesse = parseFloat(dataJson.constante);
+        let vitesseConstante = parseFloat(dataJson.constante);
 
         server.clients.forEach(function each(client) {
           if (client !== socket && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(dataJson));
+            client.send(JSON.stringify({
+              'mode': drapeauToInt(dataJson.mode),
+              'vitesse': vitesseToInt(vitesseConstante)
+            }));
           }
         })
         /*voitures.forEach(v => {
@@ -325,6 +396,11 @@ server.on('connection', function(socket, req) {
       // On ferme la connexion de la voiture
       console.log('id='+dataJson.id);
       let s = getsocket(dataJson.id);
+      // On envoie à la voiture le changement d'état
+      s.send(JSON.stringify({
+        'mode': 5,
+        'etat': 0
+      }));
       s.close();
       // On supprime la voiture des tableaux
       supprimerVoitureTableau(dataJson.id);
@@ -338,6 +414,13 @@ server.on('connection', function(socket, req) {
         reinitialisationVoiture(voiture);
       }
       voiture.etat = dataJson.etat
+
+      // On envoie à la voiture le changement d'état
+      let sock = getsocket(voiture.id);
+      sock.send(JSON.stringify({
+        'mode': 5,
+        'etat': voiture.etat
+      }));
     break;
     default:
       break;
