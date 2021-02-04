@@ -113,6 +113,31 @@ function vitesseToInt(vitesse) {
   return vitesse*100;
 }
 
+// On traduit la vitesse de 0 à 255 en -1 et 1
+function convertionTrameToVitesse(vitesse){
+  // On regarde si c'est entre 0 et 128 ou entre 128 et 255
+  if(vitesse >= 0 && vitesse <= 128){
+    vitesse = vitesse / 128;
+    vitesse = vitesse -1;
+  }
+  else if(vitesse > 128 && vitesse <= 255){
+    vitesse = vitesse - 128;
+    vitesse = vitesse /128;
+  }
+}
+// On traduit la vitesse de -1 à 1 en 0 à 255
+function convertionVitesseToTrame(vitesse){
+  // On regarde si c'est entre 0 et 128 ou entre 128 et 255
+  if(vitesse >= -1 && vitesse <= 0){
+    vitesse = vitesse + 1;
+    vitesse = vitesse * 128;
+  }
+  else if(vitesse > 0 && vitesse <= 1){
+    vitesse = vitesse * 128;
+    vitesse = vitesse + 128;
+  }
+}
+
 function envoieEtatVoiture(dataJson){
       
     // On recoit la vitesse angulaire de la part de la voiture en radian par secondes
@@ -240,9 +265,9 @@ server.on('connection', function(socket, req) {
     // si on reçoit des données de la voiture on tradruit le int du mode en string pour le switch
     if(typeof dataJson.mode === 'number') dataJson.mode = intToDrapeau(dataJson.mode);
 
-    // La voiture envoie une vitesse entre -100 et 100, nous on travaille en radian, on divise par 100
-    // pour avoir des vitesses entre -1 et 1
-    dataJson.vitesse = dataJson.vitesse / 100;
+    // La voiture envoie une vitesse entre 0 et 255, nous on travaille en radian, on traduit la vitesse en -1 et 1
+    //dataJson.vitesse = dataJson.vitesse / 100;
+    dataJson.vitesse = convertionTrameToVitesse(dataJson.vitesse);
 
     // Selon le mode, on effetue une action
     switch (dataJson.mode) {
@@ -271,7 +296,7 @@ server.on('connection', function(socket, req) {
             if (client !== socket && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 'mode': drapeauToInt(dataJson.mode),
-                'vitesse': 0
+                'vitesse': 128
               }));
             }
           })
@@ -286,7 +311,7 @@ server.on('connection', function(socket, req) {
             if (client !== socket && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 'mode': drapeauToInt(dataJson.mode),
-                'limite': vitesseToInt(limite)
+                'limite': convertionVitesseToTrame(limite)
               }));
             }
           })
@@ -307,7 +332,7 @@ server.on('connection', function(socket, req) {
             if (client !== socket && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 'mode': drapeauToInt(dataJson.mode),
-                'vitesse': vitesseToInt(vitesseDrapeauNoir)
+                'vitesse': convertionVitesseToTrame(vitesseDrapeauNoir)
               }));
             }
           })
@@ -346,7 +371,7 @@ server.on('connection', function(socket, req) {
             if (client !== socket && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 'mode': drapeauToInt(dataJson.mode),
-                'vitesse': vitesseToInt(vitesseConstante)
+                'vitesse': convertionVitesseToTrame(vitesseConstante)
               }));
             }
           })
