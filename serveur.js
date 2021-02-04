@@ -124,6 +124,7 @@ function convertionTrameToVitesse(vitesse){
     vitesse = vitesse - 128;
     vitesse = vitesse /128;
   }
+  return vitesse;
 }
 // On traduit la vitesse de -1 à 1 en 0 à 255
 function convertionVitesseToTrame(vitesse){
@@ -136,6 +137,8 @@ function convertionVitesseToTrame(vitesse){
     vitesse = vitesse * 128;
     vitesse = vitesse + 128;
   }
+  if(vitesse === 256) vitesse = 255;
+  return vitesse;
 }
 
 function envoieEtatVoiture(dataJson){
@@ -353,7 +356,7 @@ server.on('connection', function(socket, req) {
             if(voiture.vitesse === 0) return;
             socket.send(JSON.stringify({
               'mode': drapeauToInt(dataJson.mode),
-              'vitesse': 0
+              'vitesse': 128
             }));
             // On indique 
             dataJson.vitesse = 0
